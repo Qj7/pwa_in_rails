@@ -22,6 +22,8 @@
 /storage/*
 !/storage/.keep
 /tmp/storage/*
+/tmp/pids
+/tmp/cache
 !/tmp/storage/
 !/tmp/storage/.keep
 
