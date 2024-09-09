@@ -2,12 +2,36 @@
 @tailwind components;
 @tailwind utilities;
 
-/*
-
-@layer components {
-  .btn-primary {
-    @apply py-2 px-4 bg-blue-200;
-  }
+.lock-input {
+  width: 60px;
+  height: 60px;
+  text-align: center;
+  font-size: 2rem;
+  border: 2px solid #34a5da;
+  border-radius: 10px;
+  margin: 5px;
+  display: inline-block;
+  background-color: #fff;
 }
 
-*/
+.lock-input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 10px rgba(0, 123, 255, 0.5);
+}
+
+.output-step {
+  font-size: 1.25rem;
+  color: #333;
+  margin-top: 10px;
+  padding: 10px;
+  background-color: #e9ecef;
+  border-radius: 5px;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+}
+
+.lock-icon {
+  color: #333;
+  display: block;
+  margin: 0 auto;
+}

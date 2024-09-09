@@ -1,9 +1,8 @@
 Rails.application.routes.draw do
-  root 'home#index'
-  # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
+  root 'locks#index'
 
-  # Defines the root path route ("/")
-  # root "articles#index"
+  post 'open_lock', to: 'locks#open_lock'
+
   get "/service-worker.js" => "pwa#service_worker"
   get "/manifest.json" => "pwa#manifest"
 end

@@ -1,0 +1,71 @@
+  <div class="min-h-screen">
+    <!-- Навбар -->
+    <nav class="bg-gray-800 text-white w-full fixed top-0 left-0 z-50">
+      <div class="w-full p-4 flex justify-between items-center">
+        <!-- Логотип -->
+        <a href="#" class="flex items-center">
+        <%= image_tag 'logo.png', alt: 'Logo', class: 'w-34 h-12' %>
+        </a>
+        <!-- Статус сети -->
+        <div class="flex items-center space-x-2">
+          <div id="status-indicator" class="w-4 h-4 rounded-full" style="background-color: gray;"></div>
+          <span id="status">Checking...</span>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Основной контент с отступом для фиксированного навбара -->
+    <div class="flex-grow flex items-center justify-center pt-24" data-controller="lock">
+      <div class="bg-white rounded-lg shadow-lg p-8 max-w-5xl w-full grid grid-cols-2 gap-6">
+        <!-- Левая часть: Ввод данных -->
+        <div>
+          <h1 class="text-xl font-semibold text-center mb-4 text-gray-800">Lock Opener</h1>
+
+          <!-- Ввод начальных значений -->
+          <div class="mb-4">
+            <label class="block text-gray-600 mb-2">From:</label>
+            <div class="flex justify-center space-x-2">
+              <% 4.times do %>
+                <input min="0" max="9" data-lock-target="from" class="lock-input w-12 h-12 text-2xl text-center border-gray-300 border-2 rounded-lg">
+              <% end %>
+            </div>
+          </div>
+
+          <!-- Ввод конечных значений -->
+          <div class="mb-4">
+            <label class="block text-gray-600 mb-2">To:</label>
+            <div class="flex justify-center space-x-2">
+              <% 4.times do %>
+                <input min="0" max="9" data-lock-target="to" class="lock-input w-12 h-12 text-2xl text-center border-gray-300 border-2 rounded-lg">
+              <% end %>
+            </div>
+          </div>
+
+          <!-- Кнопка открытия замка -->
+          <div class="text-center">
+            <button data-action="click->lock#openLock" class="px-4 py-2 bg-[#34a5da] text-white rounded-lg hover:bg-blue-600 transition duration-300">
+              Open Lock
+            </button>
+          </div>
+        </div>
+
+        <!-- Правая часть: Результаты -->
+        <div class="min-h-80 max-h-80 overflow-auto border border-gray-300 rounded-lg p-4 bg-gray-50">
+          <h2 class="text-xl font-semibold text-center mb-4 text-gray-800">Unlock Steps</h2>
+
+          <!-- Блок для отображения шагов -->
+          <div id="output" data-lock-target="output" class="space-y-2 text-center text-gray-700">
+
+            <!-- Сообщение и картинка при отсутствии интернета -->
+            <div id="offline-message" data-lock-target="offlineMessage" style="display: none;" class="flex flex-col items-center justify-center">
+              <p class="text-red-600 font-semibold mb-4">Интернет соединение отсутствует</p>
+              <img src="/assets/lock.gif" alt="Lock" class="mx-auto mt-4" style="width: 150px; height: auto;">
+            </div>
+
+            <!-- Здесь будут отображаться шаги -->
+            <div id="unlock-steps" data-lock-target="unlockSteps"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>

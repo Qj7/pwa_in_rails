@@ -1,11 +1,9 @@
-if (navigator.serviceWorker) {
-  navigator.serviceWorker.register("/service-worker.js")
-    .then(() => navigator.serviceWorker.ready)
-    .then((registration) => {
-      if ("SyncManager" in window) {
-        registration.sync.register("sync-forms");
-      } else {
-        window.alert("This browser does not support background sync.")
-      }
-    }).then(() => console.log("[Companion]", "Service worker registered!"));
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js').then((registration) => {
+      console.log('ServiceWorker registration successful with scope: ', registration.scope);
+    }).catch((error) => {
+      console.log('ServiceWorker registration failed: ', error);
+    });
+  });
 }
