@@ -5,6 +5,7 @@ export default class extends Controller {
 
   connect() {
     console.log("lock controller connected with IndexedDB");
+    this.idsToSync = [];
     this.initIndexedDB().then(() => {
       this.checkConnectionStatus();
       this.syncOfflineData();
@@ -58,31 +59,65 @@ export default class extends Controller {
     element.style.display = isVisible ? "block" : "none";
   }
 
+  // Синхронизация данных при восстановлении интернета
   syncOfflineData() {
-    if (!navigator.onLine || !this.db) return;
+    if (!navigator.onLine || !this.db || this.idsToSync.length === 0) return;
 
-    const transaction = this.db.transaction(["locks"], "readonly");
-    const store = transaction.objectStore("locks");
-
-    store.openCursor().onsuccess = (event) => {
-      const cursor = event.target.result;
-      if (cursor) {
-        const data = cursor.value;
-        this.sendDataToServer(data.from, data.to).then(() => {
-          this.removeDataFromIndexedDB(cursor.key);
-        });
-        cursor.continue();
-      }
-    };
+    // Проходим по массиву ID и обрабатываем каждую запись
+    this.idsToSync.forEach((id) => {
+      this.getDataById(id).then((data) => {
+        if (data) {
+          this.sendDataToServer(data.from, data.to)
+            .then(() => {
+              this.removeDataFromIndexedDB(id); // Удаляем запись из IndexedDB
+              this.removeIdFromArray(id); // Удаляем ID из массива
+            })
+            .catch((error) => {
+              console.error(`Ошибка отправки данных для ID ${id}:`, error);
+            });
+        }
+      });
+    });
   }
 
-  removeDataFromIndexedDB(key) {
-    const transaction = this.db.transaction(["locks"], "readwrite");
-    const store = transaction.objectStore("locks");
-    store.delete(key);
-    console.log(`Deleted entry with id ${key} from IndexedDB.`);
+  // Получение данных по ID из IndexedDB
+  getDataById(id) {
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction(["locks"], "readonly");
+      const store = transaction.objectStore("locks");
+      const request = store.get(id);
+
+      request.onsuccess = () => {
+        resolve(request.result);
+      };
+
+      request.onerror = (event) => {
+        console.error(`Ошибка получения данных по ID ${id}:`, event.target.error);
+        reject(event.target.error);
+      };
+    });
   }
 
+  // Удаление данных из IndexedDB по ID
+  removeDataFromIndexedDB(id) {
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction(["locks"], "readwrite");
+      const store = transaction.objectStore("locks");
+      const request = store.delete(id);
+
+      request.onsuccess = () => {
+        console.log(`Deleted entry with id ${id} from IndexedDB.`);
+        resolve();
+      };
+
+      request.onerror = (event) => {
+        console.error("Ошибка удаления записи из IndexedDB:", event.target.error);
+        reject(event.target.error);
+      };
+    });
+  }
+
+  // Сохранение данных в IndexedDB и добавление ID в массив
   saveToIndexedDB(from, to) {
     if (!this.db) {
       console.error("IndexedDB is not initialized yet.");
@@ -91,8 +126,22 @@ export default class extends Controller {
 
     const transaction = this.db.transaction(["locks"], "readwrite");
     const store = transaction.objectStore("locks");
-    store.add({ from, to });
-    console.log("Data saved to IndexedDB:", { from, to });
+    const request = store.add({ from, to });
+
+    request.onsuccess = (event) => {
+      const id = event.target.result; // Получаем сгенерированный ID
+      this.idsToSync.push(id); // Добавляем ID в массив
+      console.log("Data saved to IndexedDB with id:", id);
+    };
+
+    request.onerror = (event) => {
+      console.error("Ошибка сохранения в IndexedDB:", event.target.error);
+    };
+  }
+
+  // Удаление ID из массива
+  removeIdFromArray(id) {
+    this.idsToSync = this.idsToSync.filter(storedId => storedId !== id);
   }
 
   openLock(event) {
@@ -104,7 +153,7 @@ export default class extends Controller {
     if (navigator.onLine) {
       this.sendDataToServer(from, to);
     } else {
-      this.saveToIndexedDB(from, to);
+      this.saveToIndexedDB(from, to); // Сохраняем в IndexedDB и сохраняем ID
     }
   }
 
@@ -117,12 +166,18 @@ export default class extends Controller {
       },
       body: JSON.stringify({ from, to }),
     })
-      .then((response) => response.json())
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Ошибка сервера: ${response.status}`);
+        }
+        return response.json();
+      })
       .then((data) => {
         this.displayResults(data.solution);
       })
       .catch((error) => {
         console.error("Fetch error:", error);
+        throw error;
       });
   }
 

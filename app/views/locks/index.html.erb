@@ -1,22 +1,3 @@
-  <div class="min-h-screen">
-    <!-- Навбар -->
-    <nav class="bg-gray-800 text-white w-full fixed top-0 left-0 z-50">
-      <div class="w-full p-4 flex justify-between items-center">
-        <!-- Логотип -->
-        <a href="#" class="flex items-center">
-        <%= image_tag 'logo.png', alt: 'Logo', class: 'w-34 h-12' %>
-        </a>
-
-      <!-- PWA Install Button -->
-      <button id="install-button" class="bg-blue-600 text-white px-4 py-2 rounded-lg">Install App</button>
-
-        <!-- Статус сети -->
-        <div class="flex items-center space-x-2">
-          <div id="status-indicator" class="w-4 h-4 rounded-full" style="background-color: gray;"></div>
-          <span id="status">Checking...</span>
-        </div>
-      </div>
-    </nav>
 
     <!-- Основной контент с отступом для фиксированного навбара -->
     <div class="flex-grow flex items-center justify-center pt-24" data-controller="lock">
@@ -72,4 +53,3 @@
         </div>
       </div>
     </div>
-  </div>

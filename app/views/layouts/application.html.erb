@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
+
     <%= stylesheet_link_tag "tailwind", "inter-font", "data-turbo-track": "reload" %>
 
     <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
@@ -14,6 +15,36 @@
   </head>
 
   <body>
-    <%= yield %>
+
+    <div data-controller="push" data-push-vapid-key="<%= ENV['VAPID_PUBLIC_KEY'] %>" class="min-h-screen">
+      <!-- Навбар -->
+      <nav class="bg-gray-800 text-white w-full fixed top-0 left-0 z-50">
+        <div class="w-full p-4 flex justify-between items-center">
+          <!-- Логотип -->
+          <a href="#" class="flex items-center">
+          <%= image_tag 'logo.png', alt: 'Logo', class: 'w-34 h-12' %>
+          </a>
+
+        <!-- PWA Install Button -->
+        <button id="install-button" class="bg-blue-600 text-white px-4 py-2 rounded-lg">Install App</button>
+
+        <button id="subscribeButton" class="bg-blue-600 text-white px-4 py-2 rounded-lg">
+          Subscribe
+        </button>
+        <div id="blockedMessage" style="display: none;">
+          Вы заблокировали пуши.
+        </div>
+
+          <!-- Статус сети -->
+          <div class="flex items-center space-x-2">
+            <div id="status-indicator" class="w-4 h-4 rounded-full" style="background-color: gray;"></div>
+            <span id="status">Checking...</span>
+          </div>
+        </div>
+      </nav>
+
+
+      <%= yield %>
+    </div>
   </body>
 </html>

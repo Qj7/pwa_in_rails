@@ -1,6 +1,8 @@
-// Configure your import map in config/importmap.rb. Read more: https://github.com/rails/importmap-rails
 import "@hotwired/turbo-rails";
 import "controllers";
+import "custom/companion";
+
+console.log('application.js загружен');
 
 // Функция для обновления статуса сети
 const updateNetworkStatus = () => {
@@ -46,7 +48,4 @@ if (installButton) {
   });
 }
 
-// Проверка режима standalone
-if (window.matchMedia('(display-mode: standalone)').matches) {
-  installButton.classList.add("hidden"); // Скрываем кнопку, если уже установлено как PWA
-}
+

@@ -5,4 +5,6 @@ Rails.application.routes.draw do
 
   get "/service-worker.js" => "pwa#service_worker"
   get "/manifest.json" => "pwa#manifest"
+
+  post 'notifications', to: 'notifications#create'
 end
