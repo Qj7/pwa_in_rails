@@ -1,7 +1,8 @@
-const cacheVersion = 'v2';
+const cacheVersion = 'v1';
 const assetsCacheName = `assets-${cacheVersion}`;
 const documentsCacheName = `documents-${cacheVersion}`;
-const staticResourcesCache = 'static-resources';
+const offlineCacheName = `offline-fallbacks-${cacheVersion}`;
+const offlineUrl = '/offline.html';
 
 console.log('[Service Worker] Запуск...');
 
@@ -13,34 +14,37 @@ self.addEventListener('install', (event) => {
     caches.open(assetsCacheName).then((cache) => {
       console.log('[Service Worker] Предварительное кэширование статичных ресурсов');
       return cache.addAll([
-        '/',  // Кэширование корневой страницы
-        '/manifest.json',  // Кэширование манифеста
+        '/',
+        '/manifest.json',
+        offlineUrl,
         // Здесь можно добавить дополнительные ресурсы для предварительного кэширования
       ]);
     })
   );
 });
 
-// Фаза активации: очистка старого кэша
+// Очистка старого кэша при активации нового service worker
 self.addEventListener('activate', (event) => {
   console.log('[Service Worker] Событие активации');
 
-  const cacheAllowlist = [assetsCacheName, documentsCacheName, staticResourcesCache];
+  const cacheAllowlist = [assetsCacheName, documentsCacheName, offlineCacheName];
 
   event.waitUntil(
     caches.keys().then((cacheNames) => {
+      console.log(`[Service Worker] Текущие кэши: ${cacheNames.join(', ')}`);
       return Promise.all(
         cacheNames.map((cacheName) => {
-          // Удаляем старые версии кэша, которые не в списке актуальных
           if (!cacheAllowlist.includes(cacheName)) {
             console.log(`[Service Worker] Удаление старого кэша: ${cacheName}`);
             return caches.delete(cacheName);
           }
         })
       );
+    }).then(() => {
+      console.log('[Service Worker] Все устаревшие кэши удалены');
+      return self.clients.claim();  // Уведомляем, что активация завершена
     })
   );
-  console.log('[Service Worker] Старый кэш очищен');
 });
 
 // Обработчик сообщений для SKIP_WAITING
@@ -63,9 +67,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Обрабатываем различные типы запросов
-  if (request.destination === 'document' || request.url.endsWith('manifest.json')) {
-    // Стратегия NetworkFirst для документов
+  // Обрабатываем запросы на документы
+  if (request.destination === 'document' || request.url.endsWith('manifest.json') || request.url.endsWith('offline')) {
     event.respondWith(
       caches.open(documentsCacheName).then((cache) => {
         return fetch(request)
@@ -80,8 +83,9 @@ self.addEventListener('fetch', (event) => {
           });
       })
     );
-  } else if (['script', 'style', 'image'].includes(request.destination)) {
-    // Стратегия StaleWhileRevalidate для ассетов (скрипты, стили, изображения)
+  }
+  // Кэширование ассетов (скрипты, стили, изображения, шрифты)
+  else if (['script', 'style', 'image', 'font'].includes(request.destination)) {
     event.respondWith(
       caches.open(assetsCacheName).then((cache) => {
         return cache.match(request).then((cachedResponse) => {
@@ -94,25 +98,18 @@ self.addEventListener('fetch', (event) => {
         });
       })
     );
-  } else if (request.url.match(/\.(?:woff2|woff|ttf|otf|png|jpg|jpeg|svg|gif)$/)) {
-    // Стратегия CacheFirst для статических ресурсов с истечением срока хранения
-    event.respondWith(
-      caches.open(staticResourcesCache).then((cache) => {
-        return cache.match(request).then((cachedResponse) => {
-          if (cachedResponse) {
-            console.log(`[Service Worker] Возврат кэшированного ресурса: ${request.url}`);
-            return cachedResponse;
-          }
-          return fetch(request).then((networkResponse) => {
-            console.log(`[Service Worker] Кэширование нового ресурса: ${request.url}`);
-            cache.put(request, networkResponse.clone());
-            return networkResponse;
-          });
-        });
-      })
-    );
-  } else if (request.url.match(/\/api\/.*\/*.json/)) {
-    // Стратегия NetworkOnly для API запросов
+  }
+  // Кэширование API-запросов
+  else if (request.url.match(/\/api\/.*\/*.json/)) {
     event.respondWith(fetch(request));
+  }
+});
+
+// Настройка оффлайн-фоллбека
+self.addEventListener('fetch', (event) => {
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match(offlineUrl))
+    );
   }
 });

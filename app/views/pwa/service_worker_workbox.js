@@ -8,10 +8,13 @@ if (workbox) {
   const { CacheFirst, StaleWhileRevalidate, NetworkFirst, NetworkOnly } = workbox.strategies;
   const { registerRoute } = workbox.routing;
   const { ExpirationPlugin } = workbox.expiration;
+  const { offlineFallback } = workbox.recipes;
 
-  const cacheVersion = 'v1';
-  const assetsCacheName = `assets-${cacheVersion}`;
-  const documentsCacheName = `documents-${cacheVersion}`;
+  const currentVersion = 'v1';
+  const assetsCacheName = `assets-${currentVersion}`;
+  const documentsCacheName = `documents-${currentVersion}`;
+  const offlineCacheName = `offline-fallbacks-${currentVersion}`;
+  const offlineUrl = '/offline.html';
 
   self.addEventListener("message", (event) => {
     if (event.data && event.data.type === "SKIP_WAITING") {
@@ -21,7 +24,7 @@ if (workbox) {
 
   // Кэширование рутовой страницы (/) и манифеста
   registerRoute(
-    ({ url }) => url.pathname === '/' || url.pathname.endsWith('manifest.json'),
+    ({ url }) => url.pathname === '/' || url.pathname.endsWith('manifest.json') || url.pathname.endsWith('offline'),
     new NetworkFirst({
       cacheName: documentsCacheName,
     })
@@ -29,20 +32,12 @@ if (workbox) {
 
   // Кэширование ассетов (скрипты, стили, изображения)
   registerRoute(
-    ({ request }) => ['script', 'style', 'image'].includes(request.destination),
+    ({ request }) => ['script', 'style', 'image', 'font'].includes(request.destination),
     new StaleWhileRevalidate({
       cacheName: assetsCacheName,
-    })
-  );
-
-  // Кэширование изображений с истечением срока хранения
-  registerRoute(
-    /\.(?:woff2|woff|ttf|otf|png|jpg|jpeg|svg|gif)$/,
-    new CacheFirst({
-      cacheName: 'static-resources',
       plugins: [
         new ExpirationPlugin({
-          maxEntries: 50,
+          maxEntries: 50, // Максимум 50 записей в кэше
           maxAgeSeconds: 30 * 24 * 60 * 60, // Кэш на 30 дней
         }),
       ],
@@ -55,20 +50,35 @@ if (workbox) {
     new NetworkOnly()
   );
 
-  // Очистка старого кэша при активации нового service worker
   self.addEventListener('activate', (event) => {
-    const cacheAllowlist = [assetsCacheName, documentsCacheName];
+    const cacheAllowlist = [
+      assetsCacheName,
+      documentsCacheName,
+      offlineCacheName
+    ];
+
     event.waitUntil(
       caches.keys().then((cacheNames) => {
+        console.log(`[Service Worker] Текущие кэши: ${cacheNames.join(', ')}`);
         return Promise.all(
           cacheNames.map((cacheName) => {
+            // Удаляем все кэши, которые не соответствуют актуальным версиям
             if (!cacheAllowlist.includes(cacheName)) {
+              console.log(`[Service Worker] Удаление устаревшего кэша: ${cacheName}`);
               return caches.delete(cacheName);
             }
           })
         );
+      }).then(() => {
+        console.log('[Service Worker] Все устаревшие кэши удалены');
+        // Уведомляем сервис-воркер, что активация завершена
+        return self.clients.claim();
       })
     );
+  });
+
+  offlineFallback({
+    pageFallback: offlineUrl,
   });
 
 } else {
