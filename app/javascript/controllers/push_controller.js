@@ -1,8 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static targets = []
-
   connect() {
     this.vapidKey = this.element.dataset.pushVapidKey;
     this.setupSubscription();
@@ -82,8 +80,7 @@ export default class extends Controller {
           'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
         },
         body: JSON.stringify({
-          subscription: subscription.toJSON(),
-          message: 'Hello, World!'
+          subscription: subscription.toJSON()
         })
       });
 
