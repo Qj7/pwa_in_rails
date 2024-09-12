@@ -8,13 +8,10 @@ if (workbox) {
   const { CacheFirst, StaleWhileRevalidate, NetworkFirst, NetworkOnly } = workbox.strategies;
   const { registerRoute } = workbox.routing;
   const { ExpirationPlugin } = workbox.expiration;
-  const { offlineFallback } = workbox.recipes;
 
   const currentVersion = 'v1';
   const assetsCacheName = `assets-${currentVersion}`;
   const documentsCacheName = `documents-${currentVersion}`;
-  const offlineCacheName = `offline-fallbacks-${currentVersion}`;
-  const offlineUrl = '/offline.html';
 
   self.addEventListener("message", (event) => {
     if (event.data && event.data.type === "SKIP_WAITING") {
@@ -24,7 +21,7 @@ if (workbox) {
 
   // Кэширование рутовой страницы (/) и манифеста
   registerRoute(
-    ({ url }) => url.pathname === '/' || url.pathname.endsWith('manifest.json') || url.pathname.endsWith('offline'),
+    ({ url }) => url.pathname === '/' || url.pathname.endsWith('manifest.json'),
     new NetworkFirst({
       cacheName: documentsCacheName,
     })
@@ -53,8 +50,7 @@ if (workbox) {
   self.addEventListener('activate', (event) => {
     const cacheAllowlist = [
       assetsCacheName,
-      documentsCacheName,
-      offlineCacheName
+      documentsCacheName
     ];
 
     event.waitUntil(
@@ -75,10 +71,6 @@ if (workbox) {
         return self.clients.claim();
       })
     );
-  });
-
-  offlineFallback({
-    pageFallback: offlineUrl,
   });
 
 } else {

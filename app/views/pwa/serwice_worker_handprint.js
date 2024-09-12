@@ -1,8 +1,6 @@
-const cacheVersion = 'v1';
+const cacheVersion = 'v1';  // Обновите версию при необходимости
 const assetsCacheName = `assets-${cacheVersion}`;
 const documentsCacheName = `documents-${cacheVersion}`;
-const offlineCacheName = `offline-fallbacks-${cacheVersion}`;
-const offlineUrl = '/offline.html';
 
 console.log('[Service Worker] Запуск...');
 
@@ -16,9 +14,10 @@ self.addEventListener('install', (event) => {
       return cache.addAll([
         '/',
         '/manifest.json',
-        offlineUrl,
         // Здесь можно добавить дополнительные ресурсы для предварительного кэширования
-      ]);
+      ]).catch((error) => {
+        console.error('Ошибка при кэшировании:', error);
+      });
     })
   );
 });
@@ -68,17 +67,21 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Обрабатываем запросы на документы
-  if (request.destination === 'document' || request.url.endsWith('manifest.json') || request.url.endsWith('offline')) {
+  if (request.destination === 'document' || request.url.endsWith('manifest.json')) {
     event.respondWith(
       caches.open(documentsCacheName).then((cache) => {
         return fetch(request)
           .then((response) => {
+            if (!response || response.status !== 200) {
+              console.error(`[Service Worker] Ошибка при получении документа: ${request.url}`);
+              return cache.match(request);
+            }
             console.log(`[Service Worker] Кэширование нового документа: ${request.url}`);
             cache.put(request, response.clone());
             return response;
           })
-          .catch(() => {
-            console.log(`[Service Worker] Возврат кэшированного документа: ${request.url}`);
+          .catch((error) => {
+            console.error(`[Service Worker] Возврат кэшированного документа (ошибка сети): ${request.url}`, error);
             return cache.match(request);
           });
       })
@@ -90,9 +93,16 @@ self.addEventListener('fetch', (event) => {
       caches.open(assetsCacheName).then((cache) => {
         return cache.match(request).then((cachedResponse) => {
           const fetchPromise = fetch(request).then((networkResponse) => {
+            if (!networkResponse || networkResponse.status !== 200) {
+              console.error(`[Service Worker] Ошибка при получении ассета: ${request.url}`);
+              return cachedResponse;
+            }
             console.log(`[Service Worker] Кэширование обновленного ассета: ${request.url}`);
             cache.put(request, networkResponse.clone());
             return networkResponse;
+          }).catch((error) => {
+            console.error(`[Service Worker] Ошибка сети для ассета: ${request.url}`, error);
+            return cachedResponse;
           });
           return cachedResponse || fetchPromise;
         });
@@ -101,15 +111,13 @@ self.addEventListener('fetch', (event) => {
   }
   // Кэширование API-запросов
   else if (request.url.match(/\/api\/.*\/*.json/)) {
-    event.respondWith(fetch(request));
-  }
-});
-
-// Настройка оффлайн-фоллбека
-self.addEventListener('fetch', (event) => {
-  if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match(offlineUrl))
+      fetch(request).catch((error) => {
+        console.error(`[Service Worker] Ошибка сети для API-запроса: ${request.url}`, error);
+        return new Response(JSON.stringify({ error: 'Сеть недоступна' }), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      })
     );
   }
 });
