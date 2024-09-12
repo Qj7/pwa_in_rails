@@ -13,9 +13,6 @@ if (workbox) {
   const assetsCacheName = `assets-${cacheVersion}`;
   const documentsCacheName = `documents-${cacheVersion}`;
 
-  // Предварительное кэширование (используется для кэширования статичных ресурсов)
-  workbox.precaching.precacheAndRoute([]);
-
   self.addEventListener("message", (event) => {
     if (event.data && event.data.type === "SKIP_WAITING") {
       skipWaiting();
@@ -44,7 +41,7 @@ if (workbox) {
     new CacheFirst({
       cacheName: 'static-resources',
       plugins: [
-        new ExpirationPlugin({ 
+        new ExpirationPlugin({
           maxEntries: 50,
           maxAgeSeconds: 30 * 24 * 60 * 60, // Кэш на 30 дней
         }),

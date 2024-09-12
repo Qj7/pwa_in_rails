@@ -1,4 +1,4 @@
-const cacheVersion = 'v1';
+const cacheVersion = 'v2';
 const assetsCacheName = `assets-${cacheVersion}`;
 const documentsCacheName = `documents-${cacheVersion}`;
 const staticResourcesCache = 'static-resources';
@@ -57,10 +57,10 @@ self.addEventListener('fetch', (event) => {
 
   console.log(`[Service Worker] Запрос: ${request.url}`);
 
-  // Пропускаем запросы с префиксом chrome-extension
-  if (request.url.startsWith('chrome-extension://')) {
-    console.log('[Service Worker] Пропуск запроса chrome-extension');
-    return;  // Игнорируем такие запросы
+  // Пропускаем запросы с расширениями или локальными файлами
+  if (!request.url.startsWith('http')) {
+    console.log('[Service Worker] Пропуск запроса с расширениями или локальными файлами');
+    return;
   }
 
   // Обрабатываем различные типы запросов

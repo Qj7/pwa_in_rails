@@ -4,9 +4,35 @@ export default class extends Controller {
   static targets = ["from", "to", "output", "unlockSteps", "offlineMessage"];
 
   connect() {
-    console.log("lock controller connected");
-    this.checkConnectionStatus();
-    this.syncOfflineData();
+    console.log("lock controller connected with IndexedDB");
+    this.initIndexedDB().then(() => {
+      this.checkConnectionStatus();
+      this.syncOfflineData();
+    }).catch((error) => {
+      console.error("Error connecting controller", error);
+    });
+  }
+
+  async initIndexedDB() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open("lockDB", 1);
+
+      request.onupgradeneeded = (event) => {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains("locks")) {
+          db.createObjectStore("locks", { keyPath: "id", autoIncrement: true });
+        }
+      };
+
+      request.onerror = () => {
+        reject("Error opening IndexedDB.");
+      };
+
+      request.onsuccess = (event) => {
+        this.db = event.target.result;
+        resolve();
+      };
+    });
   }
 
   checkConnectionStatus() {
@@ -33,30 +59,40 @@ export default class extends Controller {
   }
 
   syncOfflineData() {
-    const offlineData = JSON.parse(sessionStorage.getItem("locks")) || [];
+    if (!navigator.onLine || !this.db) return;
 
-    if (offlineData.length > 0 && navigator.onLine) {
-      offlineData.forEach((data, index) => {
+    const transaction = this.db.transaction(["locks"], "readonly");
+    const store = transaction.objectStore("locks");
+
+    store.openCursor().onsuccess = (event) => {
+      const cursor = event.target.result;
+      if (cursor) {
+        const data = cursor.value;
         this.sendDataToServer(data.from, data.to).then(() => {
-          this.removeDataFromSessionStorage(index);
+          this.removeDataFromIndexedDB(cursor.key);
         });
-      });
+        cursor.continue();
+      }
+    };
+  }
+
+  removeDataFromIndexedDB(key) {
+    const transaction = this.db.transaction(["locks"], "readwrite");
+    const store = transaction.objectStore("locks");
+    store.delete(key);
+    console.log(`Deleted entry with id ${key} from IndexedDB.`);
+  }
+
+  saveToIndexedDB(from, to) {
+    if (!this.db) {
+      console.error("IndexedDB is not initialized yet.");
+      return;
     }
-  }
 
-  removeDataFromSessionStorage(index) {
-    const offlineData = JSON.parse(sessionStorage.getItem("locks")) || [];
-    offlineData.splice(index, 1);
-    sessionStorage.setItem("locks", JSON.stringify(offlineData));
-    console.log(`Deleted entry at index ${index} from Session Storage.`);
-  }
-
-  saveToSessionStorage(from, to) {
-    const offlineData = JSON.parse(sessionStorage.getItem("locks")) || [];
-    const data = { from, to };
-    offlineData.push(data);
-    sessionStorage.setItem("locks", JSON.stringify(offlineData));
-    console.log("Data saved to Session Storage:", data);
+    const transaction = this.db.transaction(["locks"], "readwrite");
+    const store = transaction.objectStore("locks");
+    store.add({ from, to });
+    console.log("Data saved to IndexedDB:", { from, to });
   }
 
   openLock(event) {
@@ -68,7 +104,7 @@ export default class extends Controller {
     if (navigator.onLine) {
       this.sendDataToServer(from, to);
     } else {
-      this.saveToSessionStorage(from, to);
+      this.saveToIndexedDB(from, to);
     }
   }
 

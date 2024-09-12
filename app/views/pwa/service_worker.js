@@ -1,118 +1,87 @@
-const cacheVersion = 'v1';
-const assetsCacheName = `assets-${cacheVersion}`;
-const documentsCacheName = `documents-${cacheVersion}`;
-const staticResourcesCache = 'static-resources';
+importScripts("https://storage.googleapis.com/workbox-cdn/releases/7.1.0/workbox-sw.js");
 
-console.log('[Service Worker] Запуск...');
+if (workbox) {
+  console.log(`WB working`);
 
-// Предварительное кэширование статичных ресурсов во время установки
-self.addEventListener('install', (event) => {
-  console.log('[Service Worker] Событие установки');
+  workbox.setConfig({ debug: true });
 
-  event.waitUntil(
-    caches.open(assetsCacheName).then((cache) => {
-      console.log('[Service Worker] Предварительное кэширование статичных ресурсов');
-      return cache.addAll([
-        '/',  // Кэширование корневой страницы
-        '/manifest.json',  // Кэширование манифеста
-        // Здесь можно добавить дополнительные ресурсы для предварительного кэширования
-      ]);
+  const { CacheFirst, StaleWhileRevalidate, NetworkFirst, NetworkOnly } = workbox.strategies;
+  const { registerRoute } = workbox.routing;
+  const { ExpirationPlugin } = workbox.expiration;
+  const { offlineFallback } = workbox.recipes;
+
+  const currentVersion = 'v1';
+  const assetsCacheName = `assets-${currentVersion}`;
+  const documentsCacheName = `documents-${currentVersion}`;
+  const offlineCacheName = `offline-fallbacks-${currentVersion}`;
+  const offlineUrl = '/offline.html';
+
+  self.addEventListener("message", (event) => {
+    if (event.data && event.data.type === "SKIP_WAITING") {
+      skipWaiting();
+    }
+  });
+
+  // Кэширование рутовой страницы (/) и манифеста
+  registerRoute(
+    ({ url }) => url.pathname === '/' || url.pathname.endsWith('manifest.json') || url.pathname.endsWith('offline'),
+    new NetworkFirst({
+      cacheName: documentsCacheName,
     })
   );
-});
 
-// Фаза активации: очистка старого кэша
-self.addEventListener('activate', (event) => {
-  console.log('[Service Worker] Событие активации');
-
-  const cacheAllowlist = [assetsCacheName, documentsCacheName, staticResourcesCache];
-
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          // Удаляем старые версии кэша, которые не в списке актуальных
-          if (!cacheAllowlist.includes(cacheName)) {
-            console.log(`[Service Worker] Удаление старого кэша: ${cacheName}`);
-            return caches.delete(cacheName);
-          }
-        })
-      );
+  // Кэширование ассетов (скрипты, стили, изображения)
+  registerRoute(
+    ({ request }) => ['script', 'style', 'image', 'font'].includes(request.destination),
+    new StaleWhileRevalidate({
+      cacheName: assetsCacheName,
+      plugins: [
+        new ExpirationPlugin({
+          maxEntries: 50, // Максимум 50 записей в кэше
+          maxAgeSeconds: 30 * 24 * 60 * 60, // Кэш на 30 дней
+        }),
+      ],
     })
   );
-  console.log('[Service Worker] Старый кэш очищен');
-});
 
-// Обработчик сообщений для SKIP_WAITING
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    console.log('[Service Worker] Сообщение SKIP_WAITING получено');
-    self.skipWaiting();
-  }
-});
+  // Кэширование API-запросов
+  registerRoute(
+    /\/api\/.*\/*.json/,
+    new NetworkOnly()
+  );
 
-// Обработчик событий fetch для работы с сетевыми запросами и стратегиями кэширования
-self.addEventListener('fetch', (event) => {
-  const { request } = event;
+  self.addEventListener('activate', (event) => {
+    const cacheAllowlist = [
+      assetsCacheName,
+      documentsCacheName,
+      offlineCacheName
+    ];
 
-  console.log(`[Service Worker] Запрос: ${request.url}`);
-
-  // Пропускаем запросы с префиксом chrome-extension
-  if (request.url.startsWith('chrome-extension://')) {
-    console.log('[Service Worker] Пропуск запроса chrome-extension');
-    return;  // Игнорируем такие запросы
-  }
-
-  // Обрабатываем различные типы запросов
-  if (request.destination === 'document' || request.url.endsWith('manifest.json')) {
-    // Стратегия NetworkFirst для документов
-    event.respondWith(
-      caches.open(documentsCacheName).then((cache) => {
-        return fetch(request)
-          .then((response) => {
-            console.log(`[Service Worker] Кэширование нового документа: ${request.url}`);
-            cache.put(request, response.clone());
-            return response;
+    event.waitUntil(
+      caches.keys().then((cacheNames) => {
+        console.log(`[Service Worker] Текущие кэши: ${cacheNames.join(', ')}`);
+        return Promise.all(
+          cacheNames.map((cacheName) => {
+            // Удаляем все кэши, которые не соответствуют актуальным версиям
+            if (!cacheAllowlist.includes(cacheName)) {
+              console.log(`[Service Worker] Удаление устаревшего кэша: ${cacheName}`);
+              return caches.delete(cacheName);
+            }
           })
-          .catch(() => {
-            console.log(`[Service Worker] Возврат кэшированного документа: ${request.url}`);
-            return cache.match(request);
-          });
+        );
+      }).then(() => {
+        console.log('[Service Worker] Все устаревшие кэши удалены');
+        // Уведомляем сервис-воркер, что активация завершена
+        return self.clients.claim();
       })
     );
-  } else if (['script', 'style', 'image'].includes(request.destination)) {
-    // Стратегия StaleWhileRevalidate для ассетов (скрипты, стили, изображения)
-    event.respondWith(
-      caches.open(assetsCacheName).then((cache) => {
-        return cache.match(request).then((cachedResponse) => {
-          const fetchPromise = fetch(request).then((networkResponse) => {
-            console.log(`[Service Worker] Кэширование обновленного ассета: ${request.url}`);
-            cache.put(request, networkResponse.clone());
-            return networkResponse;
-          });
-          return cachedResponse || fetchPromise;
-        });
-      })
-    );
-  } else if (request.url.match(/\.(?:woff2|woff|ttf|otf|png|jpg|jpeg|svg|gif)$/)) {
-    // Стратегия CacheFirst для статических ресурсов с истечением срока хранения
-    event.respondWith(
-      caches.open(staticResourcesCache).then((cache) => {
-        return cache.match(request).then((cachedResponse) => {
-          if (cachedResponse) {
-            console.log(`[Service Worker] Возврат кэшированного ресурса: ${request.url}`);
-            return cachedResponse;
-          }
-          return fetch(request).then((networkResponse) => {
-            console.log(`[Service Worker] Кэширование нового ресурса: ${request.url}`);
-            cache.put(request, networkResponse.clone());
-            return networkResponse;
-          });
-        });
-      })
-    );
-  } else if (request.url.match(/\/api\/.*\/*.json/)) {
-    // Стратегия NetworkOnly для API запросов
-    event.respondWith(fetch(request));
-  }
-});
+  });
+
+  // Настройка оффлайн-фоллбека с помощью Workbox Recipes
+  offlineFallback({
+    pageFallback: offlineUrl,
+  });
+
+} else {
+  console.log("WB Error");
+}

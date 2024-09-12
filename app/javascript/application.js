@@ -25,13 +25,9 @@ let deferredPrompt;
 const installButton = document.getElementById("install-button");
 
 if (installButton) {
-  // Слушаем событие beforeinstallprompt
   window.addEventListener("beforeinstallprompt", (event) => {
-    event.preventDefault(); // Останавливаем автоматическое показ установки
+    event.preventDefault();
     deferredPrompt = event;
-
-    // Показываем кнопку установки
-    installButton.classList.remove("hidden");
 
     // Обработка нажатия на кнопку установки
     installButton.addEventListener("click", () => {
