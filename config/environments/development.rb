@@ -59,8 +59,9 @@ Rails.application.configure do
   # Suppress logger output for asset requests.
   config.assets.quiet = true
 
-  config.hosts << "c003-1-53-49-59.ngrok-free.app"
-  
+  # config.hosts << "c003-1-53-49-59.ngrok-free.app"
+  config.hosts << /.*\.ngrok(-free)?\.app$/ # ngrok (Universal)
+
   config.assets.quiet = true
   config.assets.debug = true
   config.assets.compile = true
