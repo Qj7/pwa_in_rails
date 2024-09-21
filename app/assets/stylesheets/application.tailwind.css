@@ -35,3 +35,12 @@
   display: block;
   margin: 0 auto;
 }
+
+.fade-out {
+  opacity: 1;
+  transition: opacity 1s ease-out;
+}
+
+.fade-out.hidden {
+  opacity: 0;
+}
